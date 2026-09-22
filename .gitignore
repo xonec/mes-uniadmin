@@ -1,0 +1,13 @@
+# 依赖
+node_modules/
+
+# 构建产物与本地配置
+unpackage/
+.hbuilderx/
+dist/
+
+# 系统文件
+.DS_Store
+
+# 日志
+*.log
