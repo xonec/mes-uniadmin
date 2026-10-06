@@ -1,0 +1,23 @@
+.mes-page { padding: 1.5rem; max-width: 100%; box-sizing: border-box; }
+.mes-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.2rem; }
+.mes-title { font-size: 1.4rem; font-weight: 650; line-height: 1.35; color: $uni-text-color; }
+.mes-description { font-size: .85rem; color: $uni-text-color-grey; line-height: 1.6; margin-top: .4rem; }
+.mes-toolbar, .mes-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+.mes-toolbar button, .mes-actions button { margin: 0; }
+.mes-search { box-sizing: border-box; min-width: 12rem; flex: 1 1 15rem; border: 1px solid $uni-border-color; padding: .65rem .8rem; border-radius: .3rem; height: 2.4rem; font-size: .85rem; }
+.mes-filter { min-width: 8rem; }
+.mes-table { margin-top: 1rem; border: 1px solid $uni-border-color; border-radius: .45rem; overflow-x: auto; background: $uni-bg-color; }
+.mes-pagination { display: flex; justify-content: flex-end; margin-top: 1rem; }
+.mes-error { margin: .8rem 0; color: $uni-color-error; line-height: 1.6; }
+.mes-muted { color: $uni-text-color-grey; }
+.mes-code { font-family: monospace; word-break: break-all; }
+.mes-form { max-width: 65rem; }
+.mes-fields { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.mes-field { flex: 1 1 18rem; min-width: 0; }
+.mes-field-label { display: block; font-size: .85rem; color: $uni-text-color-grey; margin-bottom: .45rem; }
+.mes-field input { box-sizing: border-box; width: 100%; min-height: 2.7rem; padding: .65rem .8rem; border: 1px solid $uni-border-color; border-radius: .3rem; font-size: .9rem; }
+.mes-field input[disabled] { background: $uni-bg-color-grey; }
+.mes-field textarea { box-sizing: border-box; width: 100%; min-height: 5rem; padding: .65rem .8rem; border: 1px solid $uni-border-color; border-radius: .3rem; font-size: .9rem; line-height: 1.6; }
+.mes-footer { margin-top: 1.5rem; border-top: 1px solid $uni-border-color; padding-top: 1rem; display: flex; gap: .7rem; flex-wrap: wrap; }
+.mes-footer button { margin: 0; }
+@media (max-width: 600px) { .mes-page { padding: 1rem; } .mes-field { flex-basis: 100%; } .mes-toolbar { width: 100%; } }

@@ -2,20 +2,16 @@
   "pages": [
     //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
     {
-      "path": "pages/index/index"
+      "path": "pages/mes/products/list",
+      "style": { "navigationBarTitleText": "产品物料 / BOM" }
     },
-    {
-      "path": "pages/demo/icons/icons",
-      "style": {
-        "navigationBarTitleText": "图标"
-      }
-    },
-    {
-      "path": "pages/demo/table/table",
-      "style": {
-        "navigationBarTitleText": "表格"
-      }
-    },
+    { "path": "pages/mes/products/edit", "style": { "navigationBarTitleText": "产品物料录入" } },
+    { "path": "pages/mes/orders/list", "style": { "navigationBarTitleText": "生产订单" } },
+    { "path": "pages/mes/orders/edit", "style": { "navigationBarTitleText": "生产订单录入" } },
+    { "path": "pages/mes/orders/trace", "style": { "navigationBarTitleText": "批号追溯" } },
+    { "path": "pages/mes/packaging/manage", "style": { "navigationBarTitleText": "客户与包装方案" } },
+    { "path": "pages/mes/ocr/config", "style": { "navigationBarTitleText": "OCR 配置" } },
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "统计概览" } },
     {
       "path": "uni_modules/uni-id-pages/pages/login/login-withpwd",
       "style": {

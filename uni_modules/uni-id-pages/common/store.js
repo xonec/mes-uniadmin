@@ -1,5 +1,6 @@
 import pagesJson from '@/pages.json'
 import config from '@/uni_modules/uni-id-pages/config.js'
+import { callMes } from '@/utils/mes-api.js'
 
 const uniIdCo = uniCloud.importObject("uni-id-co")
 const db = uniCloud.database();
@@ -44,15 +45,13 @@ export const mutations = {
 				customUI: true
 			})
 			try {
-				let res = await usersTable.where("'_id' == $cloudEnv_uid")
-					.field('mobile,nickname,username,email,avatar_file')
-					.get()
+				const profile = await callMes('user-admin', 'profile')
 
-				const realNameRes = await uniIdCo.getRealNameInfo()
+				const realNameRes = await uniIdCo.getRealNameInfo().catch(() => null)
 
 				// console.log('fromDbData',res.result.data);
 				this.setUserInfo({
-					...res.result.data[0],
+					...profile,
 					realNameAuth: realNameRes
 				})
 			} catch (e) {

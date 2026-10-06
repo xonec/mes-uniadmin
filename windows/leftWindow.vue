@@ -7,7 +7,7 @@
       collection="opendb-admin-menus"
       :page-size="500"
       :field="field"
-      where="enable==true"
+      :where="menuWhere"
       orderby="sort asc"
       active-text-color="#409eff"
       @select="select"
@@ -26,6 +26,7 @@
   const { proxy } = getCurrentInstance();
   const menu = ref(null);
   const staticMenu = config.sideBar.staticMenu;
+  const menuWhere = config.sideBar.cloudMenuWhere || 'enable==true';
   const field = 'url as value, name as text, menu_id, parent_id, sort, icon, permission';
   const currentMenu = ref('/');
   const inited = computed(() => store.state.app.inited);

@@ -48,7 +48,7 @@
       </view>
       <uni-popup class="icon-modal-box" ref="iconPopupRef" type="center">
         <view class="icon-modal icon-modal-pc">
-          <Icons :tag="false" :fix-window="false" />
+        <MenuIconPicker @select="selectIcon" />
         </view>
       </uni-popup>
     </uni-forms>
@@ -57,7 +57,7 @@
 
 <script setup>
   import validator from '@/js_sdk/validator/opendb-admin-menus.js';
-  import Icons from '@/pages/demo/icons/icons.vue';
+  import MenuIconPicker from '@/components/system/MenuIconPicker.vue';
   const db = uniCloud.database();
   const dbCmd = db.command;
   const dbCollectionName = 'opendb-admin-menus';
@@ -92,6 +92,10 @@
   const formDataId = formDataIdState;
   const formRef = ref(null);
   const iconPopupRef = ref(null);
+  const selectIcon = (icon) => {
+    formDataState.value.icon = icon;
+    iconPopupRef.value.close();
+  };
   const submitFormAction = (form) => {
     formRef.value.submit();
   };

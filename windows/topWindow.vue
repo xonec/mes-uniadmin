@@ -46,7 +46,7 @@
         </view>
 
         <!-- 语言选择器 -->
-        <view class="navbar-right-item-gap" style="position: relative" :class="{ 'popup-menu': langMenuOpened }">
+        <view v-if="langs.length > 1" class="navbar-right-item-gap" style="position: relative" :class="{ 'popup-menu': langMenuOpened }">
           <view class="lang-selector" @click="toggleLangMenu">
             <view class="admin-icons-lang" />
             <uni-icons class="arrowdown" type="arrowdown" color="#666" size="13"></uni-icons>
@@ -126,7 +126,7 @@
   const langIndex = ref(0);
   const errorLogsPopup = ref(null);
   const passwordPopup = ref(null);
-  const appName = computed(() => store.state.app.appName);
+  const appName = computed(() => config.navBar.title || store.state.app.appName);
   const routes = computed(() => store.state.app.routes);
   const theme = computed(() => store.state.app.theme);
   const logs = computed(() => store.state.error.logs);
