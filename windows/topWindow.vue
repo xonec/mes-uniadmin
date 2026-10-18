@@ -15,10 +15,14 @@
           <image class="logo-image" :src="logo" mode="heightFix"></image>
           <text class="logo-text">{{ appName }}</text>
         </view>
-        <uni-icons @click="toggleSidebar" type="bars" class="menu-icon" size="30" color="#999"></uni-icons>
+        <button class="menu-icon" :aria-expanded="showLeftWindow" aria-label="打开或收起菜单" @click="toggleSidebar"><uni-icons type="bars" size="24" color="#006A62" /></button>
       </view>
-      <view class="navbar-middle">
-        <text class="title-text">{{ navigationBarTitleText }}</text>
+      <view class="navbar-middle" aria-label="当前位置">
+        <view v-for="(route, index) in routes" :key="index" class="breadcrumb-item">
+          <text v-if="index" class="breadcrumb-separator">/</text>
+          <button v-if="route.to && index < routes.length - 1" class="breadcrumb-link" @click="openRoute(route.to.path)">{{ route.name }}</button>
+          <text v-else class="title-text" :class="{ 'breadcrumb-current': index === routes.length - 1 }">{{ route.name }}</text>
+        </view>
       </view>
       <view class="navbar-right pointer">
         <!-- #ifdef H5 -->
@@ -103,6 +107,7 @@
   import { mutations as uniIdMutations, store as uniIdStore } from '@/uni_modules/uni-id-pages/common/store.js';
   import errorLog from '@/windows/components/error-log.vue';
   import config from '@/admin.config.js';
+  import { getMenuLocation } from '@/utils/admin-menu.js';
 
   const props = defineProps({
     navigationBarTitleText: {
@@ -127,7 +132,12 @@
   const errorLogsPopup = ref(null);
   const passwordPopup = ref(null);
   const appName = computed(() => config.navBar.title || store.state.app.appName);
-  const routes = computed(() => store.state.app.routes);
+  const routes = computed(() => {
+    const fullPath = proxy.$route && proxy.$route.fullPath;
+    const location = fullPath && getMenuLocation(config.sideBar.staticMenu, fullPath);
+    if (location) return location.routes;
+    return store.state.app.routes.length ? store.state.app.routes : [{ name: props.navigationBarTitleText || '生产管理' }];
+  });
   const theme = computed(() => store.state.app.theme);
   const logs = computed(() => store.state.error.logs);
   const userInfo = computed(() => uniIdStore.userInfo);
@@ -199,7 +209,8 @@
     langMenuOpened.value = false;
     uni.setLocale(lang);
   };
-  const linkTo = () => uni.reLaunch({ url: '/' });
+  const linkTo = () => uni.reLaunch({ url: config.index.url });
+  const openRoute = (url) => uni.redirectTo({ url });
   const changeTheme = (index) => {
     const value = themes[index].value || 'default';
     if (theme.value !== value) store.commit('app/SET_THEME', value);
@@ -239,7 +250,7 @@
   }
 
   .logo {
-    min-width: 223px;
+    min-width: 220px;
     display: flex;
     align-items: center;
 
@@ -251,18 +262,28 @@
 
     .logo-text {
       margin-left: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      color: $uni-text-color;
     }
   }
 
-  .menu-icon {
-    width: 30px;
-    height: 30px;
-    line-height: 30px;
+  .header .menu-icon {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border-radius: 6px;
+  }
+  .header .menu-icon::after,
+  .header .breadcrumb-link::after {
+    border: 0;
   }
 
   .navbar-middle,
   .navbar-right {
-    flex: 1;
     /* #ifdef MP */
     margin-right: 97px;
     /* #endif */
@@ -274,16 +295,8 @@
 
   .navbar-left {
     display: flex;
-  }
-
-  // 在平板以下，保持navbar-middle
-  @media screen and (max-width: 767px) {
-    .navbar-left {
-      flex: 1;
-      /* #ifdef MP */
-      margin-right: 97px;
-      /* #endif */
-    }
+    align-items: center;
+    flex-shrink: 0;
   }
 
   .navbar-middle,
@@ -296,7 +309,34 @@
   }
 
   .navbar-middle {
-    text-align: center;
+    flex: 1;
+    min-width: 0;
+    margin-right: 20px;
+    gap: 8px;
+  }
+  .breadcrumb-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .breadcrumb-separator {
+    color: $uni-text-color-disable;
+  }
+  .breadcrumb-link {
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+    line-height: 30px;
+    background: transparent;
+    color: $uni-text-color-grey;
+  }
+  .breadcrumb-link:hover {
+    color: $uni-color-primary;
+  }
+  .breadcrumb-current {
+    color: $uni-text-color;
+    font-weight: 600;
   }
 
   .username {
@@ -304,8 +344,10 @@
   }
 
   .title-text {
-    font-size: 14px;
+    font-size: 13px;
     line-height: 30px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .navbar-menu {
@@ -343,6 +385,7 @@
 
   .navbar-right {
     display: flex;
+    flex-shrink: 0;
     justify-content: flex-end;
     align-items: center;
   }
@@ -384,8 +427,7 @@
   }
 
   /* 大屏时，隐藏的内容 */
-  .menu-icon,
-	.navbar-middle,
+  .header .menu-icon,
 	// .navbar-user,
 	.popup-menu__arrow,
 	.navbar-right .uni-mask,
@@ -395,8 +437,32 @@
   }
 
   /* 小屏，显示的内容 */
-  .navbar-mini .menu-icon {
+  .header .navbar-mini .menu-icon {
     display: block;
+  }
+  .navbar-mini .navbar-left {
+    margin-right: 12px;
+  }
+  .navbar-mini .breadcrumb-item:not(:last-child),
+  .navbar-mini .breadcrumb-separator {
+    display: none;
+  }
+  .navbar-mini .navbar-right-item-gap {
+    margin-right: 12px;
+  }
+  .navbar-mini .username {
+    max-width: 80px;
+  }
+  .header button:focus-visible {
+    outline: 2px solid $uni-color-primary;
+    outline-offset: 2px;
+  }
+  @media screen and (max-width: 480px) {
+    .navbar { padding: 0 12px; }
+    .navbar-mini .navbar-middle { margin-right: 8px; }
+    .navbar-mini .username { max-width: 60px; }
+    .navbar-mini .theme-selector { display: none; }
+    .navbar-mini .navbar-right-item-gap { margin-right: 0; }
   }
 
   .navbar-user {
@@ -540,11 +606,11 @@
       transition: background-color 0.2s;
 
       &.active {
-        color: #1890ff;
+        color: $uni-color-primary;
       }
 
       &:hover {
-        color: #1890ff;
+        color: $uni-color-primary;
       }
     }
 

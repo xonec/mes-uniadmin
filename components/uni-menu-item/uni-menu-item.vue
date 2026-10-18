@@ -10,6 +10,11 @@
       'background-color': active ? activeBackgroundColor : '',
     }"
     @click="onClickItem"
+    role="link"
+    :tabindex="disabled ? -1 : 0"
+    :aria-current="active ? 'page' : undefined"
+    @keydown.enter.prevent="onClickItem"
+    @keydown.space.prevent="onClickItem"
   >
     <slot></slot>
   </view>

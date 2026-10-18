@@ -1,16 +1,17 @@
 <template>
   <view>
-    <uni-nav-menu :active="value" activeKey="value" :activeTextColor="activeTextColor" :uniqueOpened="uniqueOpened" @select="onSelect">
-      <uni-menu-sidebar :data="staticMenu"></uni-menu-sidebar>
-      <uni-menu-sidebar :data="userMenu"></uni-menu-sidebar>
+    <uni-nav-menu :active="activeValue" activeKey="value" :activeTextColor="activeTextColor" :activeBackgroundColor="activeBackgroundColor" :uniqueOpened="uniqueOpened" @select="onSelect">
+      <uni-menu-sidebar :data="menuTree"></uni-menu-sidebar>
     </uni-nav-menu>
+    <view v-if="menuError" class="menu-load-error"><text>系统菜单读取失败</text><button size="mini" @click="load">重新读取</button></view>
   </view>
 </template>
 
 <script setup>
-  import { getCurrentInstance, onBeforeMount, ref, watch } from 'vue';
+  import { computed, getCurrentInstance, onBeforeMount, ref, watch } from 'vue';
   import { useStore } from 'vuex';
   import { buildMenus } from './util.js';
+  import { getMenuLocation, getMenuTrail, menuBreadcrumbs } from '@/utils/admin-menu.js';
 
   defineOptions({ mixins: [uniCloud.mixinDatacom] });
 
@@ -25,6 +26,8 @@
       type: String,
       default: '#42B983',
     },
+    activeBackgroundColor: { type: String, default: 'inherit' },
+    menuTransform: { type: Function, default: null },
     // 是否只保持一个子菜单的展开
     uniqueOpened: {
       type: Boolean,
@@ -41,15 +44,19 @@
   const emitEvent = defineEmits(['select', 'input']);
   const store = useStore();
   const { proxy } = getCurrentInstance();
-  const menus = ref([]);
   const userMenu = ref([]);
-  const famliy = ref([]);
+  const menuError = ref('');
+  const menuTree = computed(() => props.menuTransform ? props.menuTransform(props.staticMenu, userMenu.value) : [...props.staticMenu, ...userMenu.value]);
+  const currentPath = computed(() => (proxy.$route && proxy.$route.fullPath) || props.value);
+  const location = computed(() => getMenuLocation(menuTree.value, currentPath.value));
+  const activeValue = computed(() => location.value ? location.value.item.value : props.value);
 
   const setRoutes = (routes) => store.dispatch('app/setRoutes', routes);
   const hasLocalData = (value) => Array.isArray(value) && value.length > 0;
 
   const getUserMenu = (menuList) => {
-    const { permission, role } = uniCloud.getCurrentUserInfo();
+    const { permission = [], role = [] } = uniCloud.getCurrentUserInfo();
+    menuList = menuList.map(item => ({ ...item }));
     menuList.forEach((item) => {
       if (!menuList.some((subMenuItem) => subMenuItem.parent_id === item.menu_id)) {
         item.isLeafNode = true;
@@ -70,40 +77,27 @@
     return buildMenus(menuList);
   };
 
-  const getMenuAncestor = (menuId, menuList) => {
-    menuList.forEach((item) => {
-      if (item.menu_id !== menuId) return;
-      const route = { name: item.text };
-      if (item.value) route.to = { path: item.value };
-      famliy.value.unshift(route);
-      if (item.parent_id) getMenuAncestor(item.parent_id, menuList);
-    });
-  };
-
-  const emit = (menu) => {
-    emitEvent('select', menu, famliy.value);
-    emitEvent('input', menu.value);
-  };
-
   const onSelect = (menu) => {
-    famliy.value = [];
-    getMenuAncestor(menu.menu_id, menus.value);
-    emit(menu);
+    const routes = menuBreadcrumbs(getMenuTrail(menuTree.value, menu.menu_id));
+    emitEvent('select', menu, routes);
+    emitEvent('input', menu.value);
   };
 
   const load = () => {
     if (proxy.mixinDatacomLoading === true) return;
     proxy.mixinDatacomLoading = true;
-    proxy
+    menuError.value = '';
+    return proxy
       .mixinDatacomGet()
       .then((res) => {
         proxy.mixinDatacomLoading = false;
-        menus.value = res.result.data;
-        userMenu.value = getUserMenu(menus.value);
+        userMenu.value = getUserMenu(res.result.data);
       })
       .catch((err) => {
         proxy.mixinDatacomLoading = false;
         proxy.mixinDatacomErrorMessage = err;
+        menuError.value = err.message || '读取失败';
+        userMenu.value = [];
       });
   };
 
@@ -115,31 +109,10 @@
     { immediate: true }
   );
 
-  // #ifdef H5
   watch(
-    menus,
-    (value) => {
-      const route = proxy.$route;
-      const item = route && value.find((menu) => menu.value === route.path);
-      if (item) {
-        getMenuAncestor(item.menu_id, value);
-        setRoutes(famliy.value);
-      }
-    },
+    location,
+    (value) => setRoutes(value ? value.routes : []),
     { immediate: true }
-  );
-  // #endif
-
-  watch(
-    () => proxy.$route,
-    (value, oldValue) => {
-      if (value.fullPath !== oldValue.fullPath) {
-        famliy.value = [];
-        const menu = menus.value.find((item) => item.value === value.path);
-        getMenuAncestor(menu && menu.menu_id, menus.value);
-        setRoutes(famliy.value);
-      }
-    }
   );
 
   onBeforeMount(() => {
@@ -149,4 +122,7 @@
   defineExpose({ load });
 </script>
 
-<style></style>
+<style lang="scss">
+.menu-load-error { padding: 12px; color: $uni-text-color-grey; font-size: 12px; }
+.menu-load-error button { display: block; margin: 8px 0 0; font-size: 12px; }
+</style>

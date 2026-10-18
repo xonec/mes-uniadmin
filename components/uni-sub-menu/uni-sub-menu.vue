@@ -1,12 +1,12 @@
 <template>
-  <view class="uni-sub-menu">
-    <view class="uni-sub-menu__title" :class="{ 'is-disabled': disabled }" :style="{ paddingLeft: paddingLeft }" @click="select">
+  <view class="uni-sub-menu" :class="{ 'is-open': isOpen }">
+    <view class="uni-sub-menu__title" :class="{ 'is-disabled': disabled }" :style="{ paddingLeft: paddingLeft }" role="button" :tabindex="disabled ? -1 : 0" :aria-expanded="isOpen" @click="select" @keydown.enter.prevent="select" @keydown.space.prevent="select">
       <view class="uni-sub-menu__title-sub" :style="{ color: disabled ? '#999' : textColor }">
         <slot name="title"></slot>
       </view>
       <uni-icons class="uni-sub-menu__icon" :class="{ transition: isOpen }" type="down" color="#bbb" size="14"></uni-icons>
     </view>
-    <view class="uni-sub-menu__content" :class="{ 'uni-sub-menu--close': !isOpen }" :style="{ 'background-color': backgroundColor }">
+    <view v-show="isOpen" class="uni-sub-menu__content" :class="{ 'uni-sub-menu--close': !isOpen }" :style="{ 'background-color': backgroundColor }">
       <view id="content--hook">
         <slot></slot>
       </view>

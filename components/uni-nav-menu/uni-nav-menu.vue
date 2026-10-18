@@ -192,7 +192,10 @@
         matched = isActive(item);
         if (matched) break;
       }
-      if (!matched) closeAll();
+      if (!matched) {
+        closeOtherActive({ subMenus: [] });
+        closeAll();
+      }
     }
   });
 </script>
