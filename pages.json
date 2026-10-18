@@ -1,5 +1,15 @@
 {
   "pages": [
+{"path": "pages/mes/operations/dashboard", "style": {"navigationBarTitleText": "工作台"}},
+{"path": "pages/mes/operations/foundation", "style": {"navigationBarTitleText": "基础数据"}},
+{ "path": "pages/mes/operations/attendance", "style": { "navigationBarTitleText": "考勤记录与统计" } },
+{"path": "pages/mes/operations/schedules", "style": {"navigationBarTitleText": "生产计划"}},
+{"path": "pages/mes/operations/jobs", "style": {"navigationBarTitleText": "工单执行"}},
+{"path": "pages/mes/operations/job-detail", "style": {"navigationBarTitleText": "工单详情"}},
+{"path": "pages/mes/operations/handovers", "style": {"navigationBarTitleText": "交接班"}},
+{"path": "pages/mes/operations/exceptions", "style": {"navigationBarTitleText": "生产异常"}},
+{"path": "pages/mes/operations/reports", "style": {"navigationBarTitleText": "报表中心"}},
+{"path": "pages/mes/operations/audit", "style": {"navigationBarTitleText": "操作日志"}},
     //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
     {
       "path": "pages/mes/products/list",
@@ -8,7 +18,7 @@
     { "path": "pages/mes/products/edit", "style": { "navigationBarTitleText": "产品物料录入" } },
     { "path": "pages/mes/orders/list", "style": { "navigationBarTitleText": "生产订单" } },
     { "path": "pages/mes/orders/edit", "style": { "navigationBarTitleText": "生产订单录入" } },
-    { "path": "pages/mes/orders/trace", "style": { "navigationBarTitleText": "批号追溯" } },
+    { "path": "pages/mes/orders/trace", "style": { "navigationBarTitleText": "批次追溯" } },
     { "path": "pages/mes/packaging/manage", "style": { "navigationBarTitleText": "客户与包装方案" } },
     { "path": "pages/mes/ocr/config", "style": { "navigationBarTitleText": "OCR 配置" } },
     { "path": "pages/index/index", "style": { "navigationBarTitleText": "统计概览" } },

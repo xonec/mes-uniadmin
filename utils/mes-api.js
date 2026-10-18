@@ -1,9 +1,20 @@
 /** 调用同一空间内由生产助手工程维护的 MES 云函数。 */
 export async function callMes(name, action, payload = {}) {
-  const response = await uniCloud.callFunction({
-    name, timeout: (name === 'doc-ocr' && action === 'recognize') || (name === 'production-orders' && action === 'commitSourceImages') ? 210000 : 60000,
-    data: { ...payload, action, uniIdToken: uni.getStorageSync('uni_id_token') }
-  });
+  let response;
+  try {
+    response = await uniCloud.callFunction({
+      name, timeout: (name === 'doc-ocr' && action === 'recognize') || (name === 'production-orders' && action === 'commitSourceImages') ? 210000 : 60000,
+      data: { ...payload, action, uniIdToken: uni.getStorageSync('uni_id_token') }
+    });
+  } catch (cause) {
+    const message = String(cause && (cause.errMsg || cause.message) || '');
+    if (/request:fail|ERR_CONNECTION_|Failed to fetch|NetworkError/i.test(message)) {
+      const error = new Error('连接云服务失败，请检查网络后重试。若正在保存，请刷新核对结果后再操作。');
+      error.code = 'NETWORK_ERROR';
+      throw error;
+    }
+    throw cause;
+  }
   const result = response && response.result;
   if (!result || typeof result.code !== 'number') throw new Error('服务返回异常，请重试');
   if (result.code !== 0) {

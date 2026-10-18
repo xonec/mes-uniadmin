@@ -6,6 +6,7 @@
         <input class="uni-search" type="text" v-model="query" @confirm="search" :placeholder="$t('common.placeholder.query')" />
         <button class="uni-button hide-on-phone" type="default" size="mini" @click="search">{{ $t('common.button.search') }}</button>
         <button class="uni-button" type="primary" size="mini" @click="navigateTo('./add')">{{ $t('common.button.add') }}</button>
+        <button class="uni-button" type="primary" size="mini" @click="employeeImportOpen = true">批量建号</button>
         <button class="uni-button" type="warn" size="mini" :disabled="!selectedIndexs.length" @click="delTable">{{ $t('common.button.batchDelete') }}</button>
         <button class="uni-button" type="primary" size="mini" :disabled="!selectedIndexs.length" @click="openTagsPopup">{{ $t('common.button.tagManager') }}</button>
         <!-- #ifdef H5 -->
@@ -17,6 +18,7 @@
       </view>
     </view>
     <view class="uni-container">
+      <view v-if="employeeProfileError" class="employee-profile-error">{{ employeeProfileError }}</view>
       <unicloud-db
         ref="udbRef"
         :collection="collectionList"
@@ -33,8 +35,10 @@
       >
         <uni-table ref="tableRef" :loading="loading" :emptyText="error.message || $t('common.empty')" border stripe type="selection" @selection-change="selectionChange">
           <uni-tr>
-            <uni-th align="center" filter-type="search" @filter-change="filterChange($event, 'username')" sortable @sort-change="sortChange($event, 'username')">用户名</uni-th>
-            <uni-th align="center" filter-type="search" @filter-change="filterChange($event, 'nickname')" sortable @sort-change="sortChange($event, 'nickname')">用户昵称</uni-th>
+            <uni-th align="center" filter-type="search" @filter-change="filterChange($event, 'username')" sortable @sort-change="sortChange($event, 'username')">登录账号</uni-th>
+            <uni-th align="center">工号</uni-th>
+            <uni-th align="center" filter-type="search" @filter-change="filterChange($event, 'nickname')" sortable @sort-change="sortChange($event, 'nickname')">姓名 / 昵称</uni-th>
+            <uni-th align="center">身份证（仅管理员可见）</uni-th>
             <uni-th align="center" filter-type="search" @filter-change="filterChange($event, 'mobile')" sortable @sort-change="sortChange($event, 'mobile')">手机号码</uni-th>
             <uni-th align="center" filter-type="select" :filter-data="options.filterData.status_localdata" @filter-change="filterChange($event, 'status')">用户状态</uni-th>
             <uni-th align="center" filter-type="search" @filter-change="filterChange($event, 'email')" sortable @sort-change="sortChange($event, 'email')">邮箱</uni-th>
@@ -48,7 +52,9 @@
           </uni-tr>
           <uni-tr v-for="(item, index) in data" :key="index">
             <uni-td align="center">{{ item.username }}</uni-td>
+            <uni-td align="center">{{ employeeProfiles[item._id] ? (employeeProfiles[item._id].employeeNo || '—') : '—' }}</uni-td>
             <uni-td align="center">{{ item.nickname }}</uni-td>
+            <uni-td align="center">{{ employeeProfiles[item._id] ? employeeProfiles[item._id].idCard : '—' }}</uni-td>
             <uni-td align="center">{{ item.mobile }}</uni-td>
             <uni-td align="center">{{ options.status_valuetotext[item.status] }}</uni-td>
             <uni-td align="center">
@@ -70,6 +76,7 @@
             <uni-td align="center">
               <view class="uni-group">
                 <button @click="navigateTo('./edit?id=' + item._id, false)" class="uni-button" size="mini" type="primary">{{ $t('common.button.edit') }}</button>
+                <button @click="openEmployeeEditor(item)" class="uni-button" size="mini" type="primary">编辑档案</button>
                 <button @click="confirmDelete(item._id)" class="uni-button" size="mini" type="warn">{{ $t('common.button.delete') }}</button>
               </view>
             </uni-td>
@@ -103,10 +110,34 @@
     <!-- #ifdef H5 -->
     <batch-sms ref="batchSmsRef" toType="user" :receiver="smsReceiver" :condition="smsCondition"></batch-sms>
     <!-- #endif -->
+
+    <!-- 批量建号（员工账号，工号与登录账号分离） -->
+    <view v-if="employeeImportOpen" class="employee-entry-mask">
+      <view class="employee-entry-panel employee-entry-panel--wide">
+        <view class="employee-entry-head"><text>批量建号</text><button class="uni-button" size="mini" @click="employeeImportOpen = false">关闭</button></view>
+        <EmployeeAccountImport @created="reloadUsers" />
+      </view>
+    </view>
+
+    <!-- 编辑员工档案：工号 / 登录账号 / 姓名 -->
+    <view v-if="employeeEditorOpen" class="employee-entry-mask">
+      <view class="employee-entry-panel">
+        <view class="employee-entry-head"><text>编辑员工档案</text><button class="uni-button" size="mini" :disabled="employeeEditorBusy" @click="closeEmployeeEditor">关闭</button></view>
+        <view class="employee-entry-body">
+          <view class="employee-entry-field"><text>姓名 *</text><input v-model="employeeEditor.name" maxlength="60" :disabled="employeeEditorBusy" /></view>
+          <view class="employee-entry-field"><text>工号 *</text><input v-model="employeeEditor.employeeNo" maxlength="20" :disabled="employeeEditorBusy" placeholder="6~20 位数字" /><text class="employee-entry-note">只改档案编码，不影响登录；唯一校验由服务端返回。</text></view>
+          <view class="employee-entry-field"><text>登录账号 *</text><input v-model="employeeEditor.account" maxlength="32" :disabled="employeeEditorBusy" /><text class="employee-entry-note">修改后旧登录名立即失效、密码不变、需要重新登录。</text></view>
+          <view v-if="employeeEditorError" class="employee-entry-error">{{ employeeEditorError }}</view>
+          <view class="employee-entry-actions"><button class="uni-button" type="primary" size="mini" :disabled="employeeEditorBusy" @click="saveEmployeeEditor">{{ employeeEditorBusy ? '保存中…' : '保存' }}</button><button class="uni-button" size="mini" :disabled="employeeEditorBusy" @click="closeEmployeeEditor">取消</button></view>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup>
+  import { request } from '@/js_sdk/uni-admin/request.js';
+  import EmployeeAccountImport from '@/components/mes/EmployeeAccountImport.vue';
   import { enumConverter, filterToWhere } from '../../../js_sdk/validator/uni-id-users.js';
   import UniForms from '@/uni_modules/uni-forms/components/uni-forms/uni-forms';
   import UniFormsItem from '@/uni_modules/uni-forms/components/uni-forms-item/uni-forms-item';
@@ -129,6 +160,22 @@
   import { computed, getCurrentInstance, nextTick, ref } from 'vue';
   import { onLoad, onReady } from '@dcloudio/uni-app';
   const { proxy } = getCurrentInstance();
+  const employeeProfiles = ref({});
+  const employeeProfileError = ref('');
+  let employeeProfileEpoch = 0;
+  /** 只从管理员专用接口获取身份证，不扩大uni-id用户表的读取范围。 */
+  async function loadEmployeeProfiles(data) {
+    const epoch = ++employeeProfileEpoch;
+    employeeProfiles.value = {}; employeeProfileError.value = '';
+    try {
+      const profiles = {};
+      for (let offset = 0; offset < data.length; offset += 200) {
+        const result = await request('getEmployeeAccounts', { uids: data.slice(offset, offset + 200).map(row => row._id) });
+        (result.rows || []).forEach(row => { profiles[row.uid] = row; });
+      }
+      if (epoch === employeeProfileEpoch) employeeProfiles.value = profiles;
+    } catch (cause) { if (epoch === employeeProfileEpoch) employeeProfileError.value = cause.errMsg || cause.message || '员工身份证资料读取失败'; }
+  }
   const collectionListState = ref([
     db
       .collection('uni-id-users')
@@ -243,6 +290,7 @@
   });
   const smsReceiver = smsReceiverComputed;
   const onqueryloadAction = (data) => {
+    loadEmployeeProfiles(data);
     for (let i = 0; i < data.length; i++) {
       let item = data[i];
       const roleArr = item.role.map((item) => item.role_name);
@@ -474,9 +522,67 @@
       udbRef.value.loadData();
     }
   });
+  /* ---------- 员工账号：批量建号 + 编辑档案 ---------- */
+  const employeeImportOpen = ref(false);
+  const employeeEditorOpen = ref(false);
+  const employeeEditorBusy = ref(false);
+  const employeeEditorError = ref('');
+  const employeeEditor = ref({ uid: '', name: '', employeeNo: '', account: '', original: {} });
+  function reloadUsers() { loadDataAction(); }
+  /** 编辑入口只对「有员工档案」的账号开放；工号/账号预填自 getEmployeeAccounts。 */
+  function openEmployeeEditor(item) {
+    const profile = employeeProfiles.value[item._id] || null;
+    if (!profile) {
+      uni.showModal({ content: '该账号没有员工档案（请先在「批量建号」建档）', showCancel: false });
+      return;
+    }
+    employeeEditorError.value = '';
+    employeeEditor.value = {
+      uid: item._id,
+      name: profile.name || item.nickname || '',
+      employeeNo: profile.employeeNo || '',
+      account: profile.account || item.username || '',
+      original: { name: profile.name || '', employeeNo: profile.employeeNo || '', account: profile.account || item.username || '' }
+    };
+    employeeEditorOpen.value = true;
+  }
+  function closeEmployeeEditor() { if (employeeEditorBusy.value) return; employeeEditorOpen.value = false; employeeEditorError.value = ''; }
+  /** 按契约 { uid, employeeNo?, account?, name? } 只提交变化字段；冲突直接展示服务端文案。 */
+  async function saveEmployeeEditor() {
+    if (employeeEditorBusy.value) return;
+    const form = employeeEditor.value;
+    const name = String(form.name || '').trim();
+    const employeeNo = String(form.employeeNo || '').trim();
+    const account = String(form.account || '').trim();
+    const original = form.original || {};
+    employeeEditorError.value = '';
+    if (!name) { employeeEditorError.value = '请填写姓名'; return; }
+    if (!/^\d{6,20}$/.test(employeeNo)) { employeeEditorError.value = '工号须为 6~20 位数字'; return; }
+    if (!/^[A-Za-z0-9_-]{4,32}$/.test(account)) { employeeEditorError.value = '登录账号须为 4~32 位字母、数字、下划线或短横线'; return; }
+    const payload = { uid: form.uid };
+    if (employeeNo !== original.employeeNo) payload.employeeNo = employeeNo;
+    if (name !== original.name) payload.name = name;
+    if (account !== original.account) payload.account = account;
+    if (Object.keys(payload).length === 1) { employeeEditorError.value = '没有需要保存的修改'; return; }
+    if (payload.account) {
+      const confirmed = await new Promise(resolve => uni.showModal({ title: '修改登录账号', content: '修改后：旧登录名「' + original.account + '」立即失效、密码不变、该账号所有已登录设备需要重新登录。确认修改？', confirmText: '确认修改', success: r => resolve(r.confirm), fail: () => resolve(false) }));
+      if (!confirmed) return;
+    }
+    employeeEditorBusy.value = true;
+    try {
+      await request('updateEmployeeAccount', payload);
+      uni.showToast({ title: '员工档案已保存', icon: 'none' });
+      employeeEditorOpen.value = false;
+      reloadUsers();
+    } catch (cause) {
+      employeeEditorError.value = (cause && (cause.errMsg || cause.message)) || '保存失败，请重试';
+    } finally { employeeEditorBusy.value = false; }
+  }
+
 </script>
 
 <style lang="scss">
+  .employee-profile-error { color: $uni-color-error; margin-bottom: 1rem; }
   .tags-manager {
     &--x {
       width: 400px;
@@ -499,4 +605,18 @@
   .ml {
     margin-left: 30px;
   }
+
+.employee-entry-mask { position: fixed; inset: 0; z-index: 2000; background: rgba(17, 24, 28, .38); display: flex; justify-content: flex-end; }
+.employee-entry-panel { width: min(34rem, 96vw); height: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: -.35rem 0 1.4rem rgba(17, 24, 28, .14); overflow: auto; }
+.employee-entry-panel--wide { width: min(52rem, 96vw); }
+.employee-entry-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .9rem 1.1rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
+.employee-entry-head button { margin: 0; }
+.employee-entry-body { padding: 1rem 1.1rem; display: grid; gap: .9rem; }
+.employee-entry-panel .employee-import { margin: 1rem 1.1rem; }
+.employee-entry-field { display: grid; gap: .35rem; font-size: .82rem; color: #4b5563; }
+.employee-entry-field input { box-sizing: border-box; width: 100%; height: 2.3rem; padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .3rem; font-size: .86rem; }
+.employee-entry-note { color: #9ca3af; font-size: .72rem; line-height: 1.5; }
+.employee-entry-error { color: #e43d33; font-size: .8rem; line-height: 1.6; }
+.employee-entry-actions { display: flex; gap: .6rem; }
+.employee-entry-actions button { margin: 0; }
 </style>
