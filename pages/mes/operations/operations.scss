@@ -1,0 +1,73 @@
+@import '@/common/mes.scss';
+.ops-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 1fr); gap: 1.25rem; align-items: start; }
+.ops-panel { border: 1px solid $uni-border-color; border-radius: .625rem; background: $uni-bg-color; padding: 1.2rem; min-width: 0; box-shadow: 0 1px 4px rgba($uni-text-color, .035); }
+.ops-panel-title { font-size: 1.05rem; font-weight: 600; margin-bottom: .45rem; }
+.ops-panel .mes-fields { margin-top: 1rem; }
+.ops-hint { display: block; color: $uni-text-color-grey; font-size: .8rem; line-height: 1.65; margin-top: .4rem; }
+.ops-row { padding: 1rem 0; border-bottom: 1px solid $uni-border-color; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.ops-row:last-child { border-bottom: 0; }
+.ops-row-title { font-weight: 600; line-height: 1.55; }
+.ops-row-detail { color: $uni-text-color-grey; font-size: .8rem; line-height: 1.65; margin-top: .3rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ops-state { display: inline-block; font-size: .75rem; border: 1px solid $uni-border-color; padding: .2rem .5rem; border-radius: .25rem; background: $uni-bg-color-grey; margin-left: .5rem; white-space: nowrap; }
+.ops-summary { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+.ops-summary-cell { flex: 1 1 9rem; padding: 1rem; border-left: .2rem solid $uni-color-primary; background: $uni-bg-color-grey; }
+.ops-summary-cell strong { display: block; font-size: 1.4rem; line-height: 1.5; }
+.ops-summary-cell text { font-size: .8rem; color: $uni-text-color-grey; }
+.ops-empty { padding: 1.5rem .5rem; color: $uni-text-color-grey; line-height: 1.6; }
+.ops-inline-error { color: $uni-color-error; font-size: .8rem; }
+.ops-success { color: $uni-color-success; margin-top: .8rem; line-height: 1.6; }
+.ops-timeline { border-left: 2px solid $uni-border-color; padding-left: 1rem; margin-top: 1rem; }
+.ops-timeline-item { padding-bottom: 1.1rem; }
+.ops-section { margin-top: 1.25rem; }
+.ops-batch { font-family: ui-monospace, monospace; letter-spacing: .035em; }
+.ops-note { white-space: pre-wrap; line-height: 1.7; overflow-wrap: anywhere; }
+.ops-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.ops-tabs button { margin: 0; }
+.ops-tabs .selected { color: $uni-color-primary; border: 1px solid $uni-color-primary; }
+.ops-scroll { overflow-x: auto; }
+@media (max-width: 1000px) { .ops-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .ops-row { flex-wrap: wrap; } .ops-panel { padding: .9rem; } }
+
+/* 生产管理采用完整列表工作区，编辑表单按需在侧栏打开。 */
+.ops-layout-list { grid-template-columns: minmax(0, 1fr); }
+.mes-page { background: $uni-bg-color-grey; min-height: 100%; }
+.mes-header { padding-bottom: .25rem; }
+.mes-title { font-size: 1.15rem; font-weight: 700; }
+.mes-description { font-size: .78rem; }
+.mes-header > button { margin: 0; }
+.mes-toolbar { padding: .8rem 0; }
+.mes-toolbar .mes-filter { flex: 0 1 12rem; }
+.ops-filter-panel { padding: 1rem 1.2rem; background: $uni-bg-color; border: 1px solid $uni-border-color; border-radius: .55rem; margin-bottom: 1rem; }
+.ops-filter-panel .mes-fields { margin-bottom: 0; }
+.ops-filter-panel .mes-field { flex: 1 1 10rem; }
+.ops-filter-panel .ops-hint { margin: 0; }
+.ops-editor-panel { border: 0; border-radius: 0; padding: 1.5rem; }
+.ops-editor-panel .mes-footer { position: sticky; bottom: 0; background: $uni-bg-color; padding-bottom: .6rem; }
+.ops-status { display: inline-block; padding: .2rem .55rem; border-radius: .3rem; font-size: .75rem; line-height: 1.5; white-space: nowrap; background: $uni-bg-color-grey; color: $uni-text-color; }
+.ops-status.success { color: $uni-color-success; background: rgba($uni-color-success, .08); }
+.ops-status.warning { color: $uni-color-warning; background: rgba($uni-color-warning, .1); }
+.ops-status.muted { color: $uni-text-color-grey; }
+.ops-status.primary { color: $uni-color-primary; background: rgba($uni-color-primary, .08); }
+.ops-cell-stack { display: flex; flex-direction: column; gap: .3rem; min-width: 0; line-height: 1.6; }
+.ops-cell-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ops-cell-actions button { margin: 0; }
+.ops-table-note { color: $uni-text-color-grey; font-size: .78rem; line-height: 1.65; overflow-wrap: anywhere; }
+.ops-panel .mes-table { margin-bottom: .8rem; }
+.ops-summary-cell { border: 1px solid $uni-border-color; border-top: .2rem solid $uni-color-primary; background: $uni-bg-color; border-radius: .4rem; }
+.ops-empty { text-align: center; padding: 2.4rem 1rem; background: $uni-bg-color-grey; border-radius: .4rem; margin-top: 1rem; }
+.ops-panel-title { color: $uni-text-color; }
+@media (max-width: 600px) { .ops-filter-panel, .ops-editor-panel { padding: 1rem; } .mes-toolbar .mes-filter { flex: 1 1 100%; } }
+.ops-quick-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .8rem; margin-top: 1rem; }
+.ops-quick-grid button { margin: 0; width: 100%; text-align: left; padding: .9rem 1rem; background: $uni-bg-color-grey; border: 1px solid $uni-border-color; line-height: 1.7; }
+.ops-quick-grid button::after { border: 0; }
+.ops-quick-grid button:hover { border-color: $uni-color-primary; }
+.ops-import-counts { display: flex; flex-wrap: wrap; gap: .8rem 1.5rem; border-bottom: 1px solid $uni-border-color; padding: 1rem 0; font-size: .85rem; }
+.ops-review-context { display: flex; flex-direction: column; gap: .4rem; padding: .8rem 1rem; margin-bottom: 1rem; background: $uni-bg-color-grey; border-radius: .4rem; line-height: 1.65; }
+.mes-toolbar button.selected { color: $uni-color-primary; border-color: $uni-color-primary; }
+.ops-import-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
+.ops-import-steps > view { display: flex; flex-direction: column; gap: .35rem; padding: .8rem 1rem; border: 1px solid $uni-border-color; border-radius: .4rem; line-height: 1.6; }
+.ops-import-steps > view.complete { border-color: $uni-color-primary; }
+.ops-import-progress { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; margin-top: 1rem; background: $uni-bg-color-grey; border-radius: .4rem; font-size: .85rem; }
+.ops-history-diff { display: flex; flex-direction: column; gap: .65rem; padding: .8rem 0; line-height: 1.65; }
+.ops-diff-before { color: $uni-text-color-grey; }
+@media (max-width: 600px) { .ops-import-steps { grid-template-columns: minmax(0, 1fr); } }

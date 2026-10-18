@@ -15,6 +15,8 @@
     </view>
 </template>
 <script>
+import { MAX_MATERIAL_ROWS, patchMaterialRow, appendMaterialRow, removeMaterialRow } from '@/utils/shared/material-list.js'
+
 export default {
     props: { value: { type: Array, default: () => [] }, disabled: Boolean },
     data() {
@@ -29,12 +31,13 @@ export default {
     },
     computed: { rows() { return this.value || [] } },
     methods: {
-        patch(index, key, value) { this.$emit('input', this.rows.map((row, i) => i === index ? { ...row, [key]: value } : row)) },
+        patch(index, key, value) { this.$emit('input', patchMaterialRow(this.rows, index, key, value)) },
         add() {
-            if (this.rows.length >= 200) return uni.showToast({ title: '最多 200 行物料', icon: 'none' })
-            this.$emit('input', [...this.rows, { seq: this.rows.length + 1, materialCode: '', materialName: '', spec: '', materialVersion: null, unit: '' }])
+            const next = appendMaterialRow(this.rows)
+            if (!next) return uni.showToast({ title: '最多 ' + MAX_MATERIAL_ROWS + ' 行物料', icon: 'none' })
+            this.$emit('input', next)
         },
-        remove(index) { this.$emit('input', this.rows.filter((row, i) => i !== index).map((row, i) => ({ ...row, seq: i + 1 }))) }
+        remove(index) { this.$emit('input', removeMaterialRow(this.rows, index)) }
     }
 }
 </script>

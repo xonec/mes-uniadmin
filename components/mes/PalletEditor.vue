@@ -13,11 +13,13 @@
   </view>
 </template>
 <script>
+import { patchPalletField } from '@/utils/shared/pallet.js'
+
 export default {
   props: { value: { type: Object, default: () => ({}) }, disabled: Boolean },
   data() { return { fields: [{ key: 'casesPerLayer', label: '箱 / 层', numeric: true }, { key: 'layers', label: '层数', numeric: true }, { key: 'casesPerPallet', label: '箱 / 托', numeric: true }, { key: 'dimensions', label: '托盘尺寸', placeholder: '例如1200×1000mm，按实际标准填写', max: 120 }, { key: 'placement', label: '摆放说明', wide: true }, { key: 'sourceNote', label: '依据说明', placeholder: '客户要求或现场标准的名称、日期等', wide: true }], sourceOptions: [{ value: '', text: '请选择来源' }, { value: 'customer', text: '客户要求' }, { value: 'site', text: '现场标准' }, { value: 'document', text: '单据明确记载' }], statusOptions: [{ value: 'pending', text: '待补充' }, { value: 'confirmed', text: '已确认' }] }; },
   computed: { sourceIndex() { return Math.max(0, this.sourceOptions.findIndex(option => option.value === this.value.sourceType)); } },
-  methods: { patch(key, value) { const next = { ...this.value, [key]: value }; if ((key === 'casesPerLayer' || key === 'layers') && Number(next.casesPerLayer) > 0 && Number(next.layers) > 0) next.casesPerPallet = Number(next.casesPerLayer) * Number(next.layers); this.$emit('input', next); } }
+  methods: { patch(key, value) { this.$emit('input', patchPalletField(this.value, key, value, false).value); } }
 };
 </script>
 <style lang="scss" scoped>
