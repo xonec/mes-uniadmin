@@ -54,7 +54,13 @@
           </view>
         </view>
         <view class="panel">
-          <view class="panel-heading"><view class="heading-title"><text class="section-number">02</text><view class="panel-title">识别顺序</view></view><text class="field-note">{{ enabledSteps }} 项启用 · 单次最多 {{ form.maxModelCalls }} 次请求</text></view>
+          <view class="panel-heading"><view class="heading-title"><text class="section-number">02</text><view class="panel-title">识别顺序</view></view><view class="mes-actions"><text class="field-note">{{ enabledSteps }} 项启用 · 单次最多 {{ form.maxModelCalls }} 次请求</text><button size="mini" :disabled="busy || !ready" @click="applyDeepseekFlashChain">配置 DeepSeek 双通</button><button size="mini" :disabled="busy || !ready || testing" @click="testConnections">{{ testing ? '测试中…' : '测试连接' }}</button></view></view>
+          <view v-if="testResults.length" class="test-results">
+            <view v-for="(item, index) in testResults" :key="index" class="test-row" :class="{ bad: !item.ok }">
+              <text class="test-name">{{ item.ok ? '✓' : '✗' }} {{ item.provider || '未知供应商' }} / {{ item.model || '未配置模型' }}</text>
+              <text class="test-detail">{{ item.ok ? ('可用 · ' + item.ms + ' ms') : item.error }}</text>
+            </view>
+          </view>
           <view class="recognition-flow"><view class="flow-start"><text class="flow-caption">先初筛并查库</text><text>OCR.space 提取产品编码</text></view><view class="flow-outcomes"><view><text class="badge badge-ocr">已有产品</text><text>载入最新 BOM</text></view><view><text class="badge badge-ai">新产品 / 主动识别</text><text>按下方顺序使用原图识别</text></view></view></view>
           <view class="mes-description panel-intro">在供应商连接中添加或更换模型。上一项失败后继续下一项，成功即停止。</view>
           <view v-if="!form.modelChain.length" class="empty">尚未添加完整识别模型，请在供应商中选择后加入。</view>
@@ -76,7 +82,8 @@
       </view>
       <view class="ocr-aside">
         <view class="panel summary-panel"><view class="panel-title">当前配置</view><view class="summary-metrics"><view><text class="metric-value">{{ enabledSteps }}</text><text>启用模型步骤</text></view><view><text class="metric-value">{{ form.maxModelCalls }}</text><text>单次请求上限</text></view></view><view class="protection-item"><text class="protection-mark">✓</text><text>已有产品跳过 AI</text></view><view class="protection-item"><text class="protection-mark">✓</text><text>图片哈希校验，按需上传</text></view><view class="protection-item"><text class="protection-mark">✓</text><text>OCR 用预处理图，AI 用原图</text></view></view>
-        <view class="panel"><view class="panel-title">费用与保护</view><view class="switch-row"><text>省钱模式</text><switch :checked="form.economyMode" :disabled="busy" @change="changeEconomyMode" /></view><view class="mes-description">结果至少复用 7 天，每个模型最多尝试一次。</view><view v-for="field in limits" :key="field.key" class="mes-field limit-field"><text class="mes-field-label">{{ field.label }}</text><input v-model="form[field.key]" type="number" :placeholder="field.placeholder" :disabled="busy || form.economyMode && ['maxAttempts', 'dedupMinutes'].includes(field.key)" /></view><view class="mes-description">单次上限 1～6，包含失败与重试。每日上限为 0 表示不限额；OCR.space 使用自身额度。</view></view>
+        <view class="panel"><view class="panel-title">费用与保护</view><view v-for="field in limits" :key="field.key" class="mes-field limit-field"><text class="mes-field-label">{{ field.label }}</text><input v-model="form[field.key]" type="number" :placeholder="field.placeholder" :disabled="busy" /></view><view class="mes-description">单次模型请求上限 1～6，包含失败与重试；每个模型默认尝试 2 次（可设 1～3）。结果复用分钟独立配置，默认 10080。每日上限为 0 表示不限额；OCR.space 使用自身额度。</view></view>
+        <view class="panel"><view class="panel-title">今日用量</view><view class="summary-metrics usage-metrics"><view><text class="metric-value">{{ usage.globalUsed }}</text><text>模型调用</text></view><view><text class="metric-value">{{ usage.globalLimit || '不限' }}</text><text>全局上限</text></view><view><text class="metric-value">{{ usage.ownKeyUsers }}</text><text>自带 Key 用户</text></view></view><view class="mes-description">模型调用含重试、不含缓存命中；自带 Key 用户使用自己的额度，不占内置限额。</view></view>
       </view>
     </view>
     <!-- #ifndef H5 -->
@@ -91,8 +98,10 @@ export default {
   data() {
     return {
       ready: false, authorized: false, loading: false, saving: false, refreshing: '', error: '', updatedAt: 0,
+      usage: { date: '', globalUsed: 0, globalLimit: 0, ownKeyUsers: 0 },
+      testing: false, testResults: [],
       providerCatalog: {}, promptDefaults: {}, catalogs: {}, catalogMessages: {}, catalogSources: {}, modelChoices: {}, editingStepId: '', promptTab: 'contentPrompt',
-      form: { providers: [], modelChain: [], screenEngines: [2], maxModelCalls: 1, contentPrompt: '', bomPrompt: '', orderPrompt: '', economyMode: true, maxAttempts: 1, dedupMinutes: 10080, timeout: 35000, dailyLimit: 200, userDailyLimit: 100 },
+      form: { providers: [], modelChain: [], screenEngines: [2], maxModelCalls: 2, contentPrompt: '', bomPrompt: '', orderPrompt: '', maxAttempts: 2, dedupMinutes: 10080, timeout: 35000, dailyLimit: 200, userDailyLimit: 100 },
       engineOptions: [{ value: 2, text: '引擎 2 · 通用识别' }, { value: 3, text: '引擎 3 · 表格 / 手写' }, { value: 1, text: '引擎 1 · 旧版兼容' }],
       promptTabs: [{ key: 'contentPrompt', label: '内容识别' }, { key: 'bomPrompt', label: 'BOM 补充规则' }, { key: 'orderPrompt', label: '订单补充规则' }],
       limits: [{ key: 'maxModelCalls', label: '单次最多模型请求', placeholder: '1～6' }, { key: 'timeout', label: '单次超时（毫秒）', placeholder: '5000～60000' }, { key: 'maxAttempts', label: '每个模型最多尝试', placeholder: '1～3，含首次' }, { key: 'dailyLimit', label: '模型全局每日上限', placeholder: '0=不限' }, { key: 'userDailyLimit', label: '模型每人每日上限', placeholder: '0=不限' }, { key: 'dedupMinutes', label: '结果复用（分钟）', placeholder: '10080（7 天）' }]
@@ -164,10 +173,6 @@ export default {
       provider.apiUrl = event.detail.value; provider.apiKey = '';
       provider.keySet = provider.savedType === provider.type && provider.savedApiUrl === provider.apiUrl && provider.savedKeySet;
       provider.keyEditing = !provider.keySet; this.resetCatalog(provider);
-    },
-    changeEconomyMode(event) {
-      this.form.economyMode = !!event.detail.value;
-      if (this.form.economyMode) { this.form.maxAttempts = 1; this.form.dedupMinutes = Math.max(10080, Number(this.form.dedupMinutes) || 0); }
     },
     changeEngine(index, value) {
       const previous = this.form.screenEngines[index], duplicate = this.form.screenEngines.findIndex((engine, position) => engine === value && position !== index);
@@ -259,6 +264,7 @@ export default {
         const result = await callMes('doc-ocr', 'getConfig');
         if (!result.config || !Array.isArray(result.config.providers)) throw new Error('请先上传本次更新的 doc-ocr 与 ocr-config 公共模块');
         const previous = this.form.providers; this.providerCatalog = result.providerCatalog; this.promptDefaults = result.promptDefaults; this.updatedAt = result.updatedAt || 0;
+        this.usage = Object.assign({}, this.usage, result.usage || {});
         const providers = result.config.providers.map(({ id, type, name, apiUrl, enabled, keySet }) => ({ id, type, name, apiUrl, enabled, keySet: !!keySet, apiKey: '', keyEditing: !keySet, savedType: type, savedApiUrl: apiUrl, savedKeySet: !!keySet }));
         const catalogs = {}, messages = {}, sources = {};
         for (const provider of providers) {
@@ -272,6 +278,36 @@ export default {
         this.modelChoices = choices; this.editingStepId = ''; this.ready = true; return true;
       } catch (error) { this.error = error.message; return false; }
       finally { this.loading = false; }
+    },
+    /** 对每个启用步骤发一次极小的文本请求，验证 Key / 模型名 / 地址 / 网络。 */
+    async testConnections() {
+      if (this.busy || this.testing || !this.ready) return;
+      this.testing = true; this.error = ''; this.testResults = [];
+      try {
+        const result = await callMes('doc-ocr', 'testModel');
+        this.testResults = Array.isArray(result.results) ? result.results : [];
+        if (!this.testResults.length) this.error = '没有启用的模型步骤，请先在识别顺序中添加';
+      } catch (error) { this.error = error.message; }
+      finally { this.testing = false; }
+    },
+    /** 一键把识别顺序设为 DeepSeek 官方 Flash → 硅基流动 DeepSeek Flash 双通道。 */
+    applyDeepseekFlashChain() {
+      if (this.busy || !this.ready) return;
+      const FLASH_MODEL = { deepseek: 'deepseek-flash', siliconflow: 'deepseek-ai/DeepSeek-V4.1-Flash' };
+      const steps = [];
+      for (const type of ['deepseek', 'siliconflow']) {
+        const provider = this.form.providers.find(item => item.type === type && item.enabled !== false);
+        if (!provider) continue;
+        const model = FLASH_MODEL[type];
+        steps.push({ id: this.newId('step'), providerId: provider.id, model, textModel: model, enabled: true });
+      }
+      if (steps.length < 2) {
+        uni.showToast({ title: '请先在供应商连接中启用 DeepSeek 与硅基流动', icon: 'none' });
+        return;
+      }
+      this.form.modelChain = steps;
+      this.form.maxModelCalls = Math.max(Number(this.form.maxModelCalls) || 1, 2);
+      uni.showToast({ title: '已配置双通顺序，保存后生效', icon: 'none' });
     },
     async save() {
       if (this.busy || !this.ready) return; this.error = ''; this.saving = true;
@@ -324,6 +360,7 @@ export default {
 .prompt-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 .8rem; } .prompt-tabs button { margin: 0; } .prompt-tabs .selected { background: $uni-color-primary; color: $uni-text-color-inverse; }
 .prompt-editor { width: 100%; height: 24rem; box-sizing: border-box; padding: .9rem; border: 1px solid $uni-table-border-color; border-radius: .4rem; background: $uni-bg-color-grey; font-family: monospace; font-size: .82rem; line-height: 1.65; } .prompt-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; font-size: .75rem; color: $uni-text-color-grey; margin-top: .6rem; }
 .switch-row { display: flex; justify-content: space-between; gap: .8rem; align-items: center; margin: 1rem 0; font-size: .85rem; } .limit-field { margin-top: 1rem; }
+.test-results { margin: .8rem 0 1rem; border: 1px solid $uni-table-border-color; border-radius: .6rem; overflow: hidden; } .test-row { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem .8rem; font-size: .82rem; border-bottom: 1px solid $uni-table-border-color; } .test-row:last-child { border-bottom: none; } .test-row .test-name { color: #1f7a4d; font-weight: 600; } .test-row.bad .test-name { color: #c0392b; } .test-row .test-detail { color: #6b7671; word-break: break-all; text-align: right; }
 .summary-metrics { display: flex; gap: 1rem; margin: 1.1rem 0; padding-bottom: 1rem; border-bottom: 1px solid $uni-table-border-color; } .summary-metrics > view { display: flex; flex: 1; flex-direction: column; gap: .3rem; font-size: .73rem; color: $uni-text-color-grey; } .metric-value { font-size: 1.7rem; line-height: 1.2; color: $uni-color-primary; font-weight: 650; }
 .protection-item { display: flex; align-items: center; gap: .5rem; font-size: .78rem; line-height: 1.6; margin-top: .6rem; color: $uni-text-color; } .protection-mark { color: $uni-color-success; } .error-banner { padding: .8rem 1rem; background: rgba($uni-color-error, .06); border-radius: .4rem; }
 @media (max-width: 1100px) { .ocr-aside { max-width: 100%; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 1rem; } .ocr-aside .panel { flex: 1 1 17rem; min-width: 0; } }
