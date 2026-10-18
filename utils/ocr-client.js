@@ -57,7 +57,7 @@ export function buildOcrRequest(images, purpose, options = {}) {
     return { ...options, protocolVersion: OCR_PROTOCOL_VERSION, images: data, originalHashes, processedHashes, purpose: purpose === 'bom' ? 'bom' : 'order' }
 }
 
-/** 先确认同一空间中的云函数已支持初筛查库流程，再发送照片；旧接口不进入识别。 */
+/** 先确认同一空间中的云函数已支持「大模型优先 + 免费 OCR 兜底」流程，再发送照片；旧接口不进入识别。 */
 export async function recognizeOcr(call, images, purpose, options = {}) {
     const payload = buildOcrRequest(images, purpose, options)
     if (!serviceCheckedAt || Date.now() - serviceCheckedAt > SERVICE_CHECK_TTL || (payload.useModel === true && (!serviceCapabilities || serviceCapabilities.modelFallback !== true))) {
@@ -92,7 +92,7 @@ export async function recognizeOcr(call, images, purpose, options = {}) {
             try {
                 await archiveOcrSource(call, images, result)
                 const recognized = await call('doc-ocr', 'recognize', { ...metadata, ...uploadState, sourceDocumentId: result.sourceDocumentId })
-                if (recognized.needsOriginalImages || recognized.needsProcessedImages) throw new Error('原图或初筛状态已过期，请重试；已归档的同哈希照片会复用')
+                if (recognized.needsOriginalImages || recognized.needsProcessedImages) throw new Error('原图或兜底识别状态已过期，请重试；已归档的同哈希照片会复用')
                 return recognized
             } catch (error) { await cleanupUpload(call, uploadState); throw error }
         }

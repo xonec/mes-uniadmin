@@ -7,7 +7,7 @@
       <button size="mini" :disabled="busy || disabled" @click="choose(['camera'])">相机拍照</button>
       <button size="mini" :disabled="busy || disabled" @click="choose(['album'])">相册 / 选择照片</button>
       <button size="mini" v-if="images.length" :disabled="busy || disabled" @click="clearPhotos">清空照片</button>
-      <button size="mini" type="primary" :disabled="busy || disabled || !images.length || photosRecognized || needsProductCodeConfirmation" @click="recognize()">{{ recognizing ? '正在识别，请稍候…' : needsProductCodeConfirmation ? '初筛未确认编码' : photosRecognized ? '已识别，请直接核对' : '初筛并识别' }}</button>
+      <button size="mini" type="primary" :disabled="busy || disabled || !images.length || photosRecognized || needsProductCodeConfirmation" @click="recognize()">{{ recognizing ? '正在识别，请稍候…' : needsProductCodeConfirmation ? '兜底 OCR 未确认编码' : photosRecognized ? '已识别，请直接核对' : '兜底识别' }}</button>
       <button v-if="purpose === 'order' && photosRecognized" size="mini" :disabled="busy || disabled" @click="recognize('', true)">完整识别本单（使用模型额度）</button>
     </view>
     <view class="photo-preview" v-if="images.length">
@@ -29,7 +29,7 @@
       <view class="photo-note">确认后将查询产品档案；库中无该编码时将使用大模型额度，并替换当前录入内容。</view>
       <button size="mini" type="primary" :disabled="busy || disabled" @click="confirmProductCode">确认编码并继续</button>
     </view>
-    <view class="photo-note">初筛找到已有档案（含停用档案）时跳过大模型；编码未识别时，可选择大模型自动识别或手动确认编码。订单保留本次订单号、批号和产量。</view>
+    <view class="photo-note">大模型优先识别；失败或额度不足时自动用免费 OCR 兜底（每次识别都会消耗模型额度）。识别出编码后查询产品档案，命中已有产品（含停用档案）时载入最新 BOM，仍需按本单核对。订单保留本次订单号、批号和产量。</view>
   </view>
 </template>
 <script>
@@ -67,7 +67,7 @@ export default {
       if (this.purpose === 'bom' && this.expectedProductCode && code !== this.expectedProductCode) { this.error = '确认的产品编码与当前产品不一致，请在新增页面导入'; return; }
       await this.recognize(code);
     },
-    /** 初筛未确认编码时，主动用大模型识别，无需先手填编码。 */
+    /** 兜底 OCR 未确认编码时，主动用大模型识别，无需先手填编码。 */
     async recognizeWithModel() {
       if (this.busy || this.disabled || !this.canUseModelFallback || !this.needsProductCodeConfirmation) return;
       await this.recognize('', true);
@@ -88,7 +88,7 @@ export default {
         this.recognitionDocument = result.recognitionDocument || null;
         this.$emit('recognized', result);
         this.lastRecognizedImages = !this.needsProductCodeConfirmation && (result.archiveMatched || result.modelUsed || result.recognitionSource === 'cache') ? this.images.map(ocrImageIdentity) : []; this.recognizedPurpose = this.purpose;
-        const title = this.needsProductCodeConfirmation ? (this.canUseModelFallback ? '可使用大模型或确认编码' : '请确认产品编码后继续') : result.archiveMatched ? (result.modelUsed ? '本单完整识别完成' : '已载入产品信息，未调用大模型') : result.recognitionSource === 'cache' ? '已复用识别结果，请核对' : result.modelUsed ? '识别完成，请核对' : '初筛完成，请核对';
+        const title = this.needsProductCodeConfirmation ? (this.canUseModelFallback ? '可使用大模型或确认编码' : '请确认产品编码后继续') : result.archiveMatched ? (result.modelUsed ? '本单完整识别完成' : '已载入产品信息，未调用大模型') : result.recognitionSource === 'cache' ? '已复用识别结果，请核对' : result.modelUsed ? '识别完成，请核对' : '兜底识别完成，请核对';
         uni.showToast({ title, icon: 'none' });
       } catch (error) { this.error = error.message || '识别失败，请重试'; }
       finally { this.recognizing = false; this.$emit('busy', false); }

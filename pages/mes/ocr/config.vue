@@ -14,7 +14,7 @@
           <view v-if="editingStepId" class="edit-notice"><text>正在更换第 {{ editingStepIndex + 1 }} 项模型，可在任一供应商中选择后应用。</text><button size="mini" :disabled="busy" @click="editingStepId = ''">取消更换模型</button></view>
           <view v-for="provider in form.providers" :id="'supplier-' + provider.id" :key="provider.id" class="provider-card" :class="{ paused: !provider.enabled }">
             <view class="provider-heading">
-              <view class="provider-identity"><text class="provider-name">{{ provider.name }}</text><text class="badge" :class="provider.type === 'ocrspace' ? 'badge-ocr' : 'badge-ai'">{{ provider.type === 'ocrspace' ? '免费初筛' : 'AI 模型' }}</text><text class="connection-status" :class="{ configured: provider.keySet && !provider.keyEditing }">{{ keyStatus(provider) }}</text></view>
+              <view class="provider-identity"><text class="provider-name">{{ provider.name }}</text><text class="badge" :class="provider.type === 'ocrspace' ? 'badge-ocr' : 'badge-ai'">{{ provider.type === 'ocrspace' ? '免费 OCR 兜底' : 'AI 模型' }}</text><text class="connection-status" :class="{ configured: provider.keySet && !provider.keyEditing }">{{ keyStatus(provider) }}</text></view>
               <view class="mes-actions provider-actions"><text class="control-label">{{ provider.enabled ? '启用' : '停用' }}</text><switch :checked="provider.enabled" :disabled="busy || provider.type === 'ocrspace'" @change="provider.enabled = !!$event.detail.value" /><button v-if="provider.type !== 'ocrspace'" size="mini" :disabled="busy" @click="removeProvider(provider.id)">移除</button></view>
             </view>
             <view class="mes-fields connection-fields">
@@ -47,9 +47,9 @@
               <view class="model-selection-footer"><view class="selection-caption"><text>{{ selectedCapability(provider) }}</text><button size="mini" class="text-button" :disabled="busy" @click="modelChoices[provider.id].manual = !modelChoices[provider.id].manual">{{ modelChoices[provider.id].manual ? '收起手动输入' : '手动填写模型 ID' }}</button></view><button size="mini" type="primary" :disabled="busy || !provider.enabled || !editingStepId && form.modelChain.length >= 6" @click="applyModelChoice(provider)">{{ editingStepId ? '应用到第 ' + (editingStepIndex + 1) + ' 项' : '加入识别顺序' }}</button></view>
             </view>
             <view v-else class="ocr-engines">
-              <view class="model-catalog-heading"><text class="subsection-title">初筛引擎顺序</text><button size="mini" :disabled="busy || form.screenEngines.length >= 3" @click="addEngine">添加备用引擎</button></view>
+              <view class="model-catalog-heading"><text class="subsection-title">兜底 OCR 引擎顺序</text><button size="mini" :disabled="busy || form.screenEngines.length >= 3" @click="addEngine">添加备用引擎</button></view>
               <view v-for="(engine, index) in form.screenEngines" :key="index" class="engine-row"><text class="number">{{ index + 1 }}</text><view class="select-wrap"><uni-data-select :model-value="engine" :localdata="engineOptions" :clear="false" :disabled="busy" @change="changeEngine(index, $event)" /></view><view class="mes-actions"><button size="mini" :disabled="busy || index === 0" @click="move('screenEngines', index, -1)">上移</button><button size="mini" :disabled="busy || index === form.screenEngines.length - 1" @click="move('screenEngines', index, 1)">下移</button><button size="mini" :disabled="busy || form.screenEngines.length === 1" @click="form.screenEngines.splice(index, 1)">移除</button></view></view>
-              <view class="field-note">使用预处理图片；前一引擎未确认产品编码时，才尝试下一项。</view>
+              <view class="field-note">仅在大模型失败或额度不足、走免费 OCR 兜底时使用（用预处理图）；按顺序尝试，前一引擎未确认产品编码时才试下一项。</view>
             </view>
           </view>
         </view>
@@ -61,7 +61,7 @@
               <text class="test-detail">{{ item.ok ? ('可用 · ' + item.ms + ' ms') : item.error }}</text>
             </view>
           </view>
-          <view class="recognition-flow"><view class="flow-start"><text class="flow-caption">先初筛并查库</text><text>OCR.space 提取产品编码</text></view><view class="flow-outcomes"><view><text class="badge badge-ocr">已有产品</text><text>载入最新 BOM</text></view><view><text class="badge badge-ai">新产品 / 主动识别</text><text>按下方顺序使用原图识别</text></view></view></view>
+          <view class="recognition-flow"><view class="flow-start"><text class="flow-caption">大模型优先识别</text><text>按下方识别顺序使用原图</text></view><view class="flow-outcomes"><view><text class="badge badge-ai">识别成功</text><text>命中产品档案时载入最新 BOM</text></view><view><text class="badge badge-ocr">失败 / 额度不足</text><text>自动用免费 OCR 兜底，仍需人工核对</text></view></view></view>
           <view class="mes-description panel-intro">在供应商连接中添加或更换模型。上一项失败后继续下一项，成功即停止。</view>
           <view v-if="!form.modelChain.length" class="empty">尚未添加完整识别模型，请在供应商中选择后加入。</view>
           <view v-for="(step, index) in form.modelChain" :key="step.id" class="model-step" :class="{ paused: !step.enabled, 'editing-step': editingStepId === step.id }">
@@ -81,7 +81,7 @@
         <view class="mes-footer"><button type="primary" :disabled="busy" @click="save">{{ saving ? '保存中…' : '保存配置' }}</button><text class="mes-description">供应商、识别顺序和模板统一保存。</text></view>
       </view>
       <view class="ocr-aside">
-        <view class="panel summary-panel"><view class="panel-title">当前配置</view><view class="summary-metrics"><view><text class="metric-value">{{ enabledSteps }}</text><text>启用模型步骤</text></view><view><text class="metric-value">{{ form.maxModelCalls }}</text><text>单次请求上限</text></view></view><view class="protection-item"><text class="protection-mark">✓</text><text>已有产品跳过 AI</text></view><view class="protection-item"><text class="protection-mark">✓</text><text>图片哈希校验，按需上传</text></view><view class="protection-item"><text class="protection-mark">✓</text><text>OCR 用预处理图，AI 用原图</text></view></view>
+        <view class="panel summary-panel"><view class="panel-title">当前配置</view><view class="summary-metrics"><view><text class="metric-value">{{ enabledSteps }}</text><text>启用模型步骤</text></view><view><text class="metric-value">{{ form.maxModelCalls }}</text><text>单次请求上限</text></view></view><view class="protection-item"><text class="protection-mark">✓</text><text>识别失败自动免费 OCR 兜底</text></view><view class="protection-item"><text class="protection-mark">✓</text><text>图片哈希校验，按需上传</text></view><view class="protection-item"><text class="protection-mark">✓</text><text>OCR 用预处理图，AI 用原图</text></view></view>
         <view class="panel"><view class="panel-title">费用与保护</view><view v-for="field in limits" :key="field.key" class="mes-field limit-field"><text class="mes-field-label">{{ field.label }}</text><input v-model="form[field.key]" type="number" :placeholder="field.placeholder" :disabled="busy" /></view><view class="mes-description">单次模型请求上限 1～6，包含失败与重试；每个模型默认尝试 2 次（可设 1～3）。结果复用分钟独立配置，默认 10080。每日上限为 0 表示不限额；OCR.space 使用自身额度。</view></view>
         <view class="panel"><view class="panel-title">今日用量</view><view class="summary-metrics usage-metrics"><view><text class="metric-value">{{ usage.globalUsed }}</text><text>模型调用</text></view><view><text class="metric-value">{{ usage.globalLimit || '不限' }}</text><text>全局上限</text></view><view><text class="metric-value">{{ usage.ownKeyUsers }}</text><text>自带 Key 用户</text></view></view><view class="mes-description">模型调用含重试、不含缓存命中；自带 Key 用户使用自己的额度，不占内置限额。</view></view>
       </view>
