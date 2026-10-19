@@ -50,6 +50,46 @@ function page(name, overrides = {}, filename) {
     state.watchers['filters.periodType'].call(state, 'month');
     assert.equal(state.filters.period, '2025-05');
   });
+  await test('考勤冲突卡片对比新排班与本人记录并由管理员选择', async () => {
+    const row = { _id: 'a1', personId: 'p1', personName: '张三', date: '2026-10-09', version: 4, kind: 'work', shiftName: '早班', processNames: ['灌装'], startTime: '08:00', endTime: '17:00', startDayOffset: 0, endDayOffset: 0, workHours: 9, conflict: { incoming: { kind: 'work', shiftName: '中班', processNames: ['灌装'], startTime: '16:00', endTime: '00:00', startDayOffset: 0, endDayOffset: 1, workHours: 8 }, retained: { kind: 'work', shiftName: '早班', processNames: ['灌装'], startTime: '08:00', endTime: '17:00', startDayOffset: 0, endDayOffset: 0, workHours: 9, note: '延长到17:00' } } };
+    let sent = null;
+    const state = page('attendance', {
+      confirmMes: async () => true,
+      operationRequest: () => ({ id: 'test-request' }),
+      shiftTimeLabel: item => item.startTime + '—' + item.endTime,
+      callOperations: async (action, payload) => {
+        if (action === 'resolveAttendanceConflict') { sent = payload; return {}; }
+        if (action === 'bootstrap') return { profile: { isAdmin: true }, catalogs: emptyCatalogs() };
+        if (action === 'attendanceSummary') return { from: '2026-10-01', to: '2026-10-31', persons: [], processes: [], attendanceDays: 0, workHours: 0, conflictCount: 1 };
+        if (action === 'listAttendance') return { list: [row], total: 1 };
+        return {};
+      }
+    });
+    await state.search();
+    assert.equal(state.conflictCount, 1);
+    assert.equal(state.conflictRows.length, 1);
+    assert.equal(state.conflictParts(row.conflict.incoming).find(part => part.label === '班次').value, '中班');
+    assert.equal(state.conflictParts(row.conflict.incoming).find(part => part.label === '工时').value, '8 小时');
+    assert.equal(state.conflictParts(row.conflict.retained).find(part => part.label === '工时').value, '9 小时');
+    assert.ok(state.conflictParts(row.conflict.retained).some(part => part.label === '备注' && /延长/.test(part.value)));
+    await state.askResolve(row, 'schedule');
+    assert.equal(sent.id, 'a1');
+    assert.equal(sent.choice, 'schedule');
+    assert.equal(sent.expectedVersion, 4);
+    assert.equal(sent.requestId, 'test-request');
+    assert.match(state.conflictNotice, /采用新排班/);
+    const source = fs.readFileSync(admin + '/pages/mes/operations/attendance.vue', 'utf8');
+    assert.ok(/待处理冲突/.test(source));
+    assert.ok(!/等待员工选择整条记录/.test(source));
+  });
+  await test('考勤冲突处理在管理员权限未生效时提示等待上传', async () => {
+    const row = { _id: 'a2', personName: '李四', date: '2026-10-09', version: 2, conflict: { incoming: {}, retained: {} } };
+    const error = new Error('请由该员工本人选择保留哪份考勤'); error.code = 403;
+    const state = page('attendance', { confirmMes: async () => true, operationRequest: () => ({ id: 'test-request' }), callOperations: async action => { if (action === 'resolveAttendanceConflict') throw error; return {}; } });
+    await state.askResolve(row, 'retained');
+    assert.match(state.conflictError, /管理员处理权限尚未在云端生效/);
+    assert.equal(state.conflictBusyId, '');
+  });
   for (const [from,to,valid] of [['2026-01-01','2026-01-31',true],['2026-01-01','2026-02-01',false],['2026-10-09','2026-10-08',false],['2026-02-29','2026-03-01',false],['2028-02-29','2028-03-01',true],['','2026-10-09',false]]) await test('报表日期 ' + from + '/' + to,async()=>{let calls=0;const state=page('reports',{callOperations:async()=>{calls++;return {rows:[],totals:[]};}});state.dateFrom=from;state.dateTo=to;await state.reload();assert.equal(calls,valid?1:0);assert.equal(!!state.error,!valid);});
   await test('报表导出使用成功查询范围',async()=>{let filename='';const state=page('reports',{exportCsv:name=>filename=name});await state.reload();state.dateFrom='2026-10-01';state.exportReport();assert.ok(filename.includes('2026-10-09_2026-10-09'));});
   const miniFile = root + '/mes-uniapp/pages/operations/attendance.vue';
@@ -69,25 +109,12 @@ function page(name, overrides = {}, filename) {
     assert.equal(calls.find(row => row.action === 'myAttendance').payload.periodType, 'year');
     assert.equal(state.rows[0]._id, 'a1');
   });
-  await test('小程序员工不填原因也直接保存多工序记录', async () => {
-    const calls = []; const state = mini({callOperations:async (action,payload)=>{calls.push({action,payload});}});
-    state.load = async () => {}; state.edit({_id:'a1',version:3,date:'2026-10-10',kind:'work',shiftId:'s1',processIds:['p1','p2'],startTime:'08:00',endTime:'16:00',startDayOffset:0,endDayOffset:0});
-    await state.save(); assert.equal(calls.length,1); assert.equal(calls[0].action,'saveAttendance');
-    assert.equal(calls[0].payload.expectedVersion,3); assert.equal(calls[0].payload.record.changeReason,'');
-    assert.equal(calls[0].payload.record.processIds.length,2); assert.equal(state.selectedHours,8);
-  });
-  await test('小程序休息记录清空班次和工序', async () => {
-    let payload; const state = mini({callOperations:async (_,value)=>{payload=value;}}); state.load=async()=>{}; state.edit(); state.form.kind='rest'; state.form.shiftId='old'; state.form.processIds=['old']; await state.save(); assert.equal(payload.record.shiftId,''); assert.equal(payload.record.processIds.length,0); assert.equal(payload.expectedVersion,0);
-  });
-  await test('小程序实际时间支持12小时跨夜和8小时次日夜班', async () => {
-    const state=mini(); Object.assign(state.form,{startTime:'20:00',endTime:'08:00',startDayOffset:0,endDayOffset:1}); assert.equal(state.selectedHours,12);
-    Object.assign(state.form,{startTime:'00:00',endTime:'08:00',startDayOffset:1,endDayOffset:1}); assert.equal(state.selectedHours,8);
-  });
-  await test('小程序工序选择覆盖本人车间启用工序', async () => {
-    const state=mini(); state.profile={workshopId:'w1',processIds:['p1']}; state.catalogs={processes:[{_id:'p1',workshopId:'w1'},{_id:'p2',workshopId:'w1'},{_id:'p3',workshopId:'w2'},{_id:'p4',workshopId:'w1',enabled:false}]}; assert.equal(state.processes.map(row=>row._id).join(','),'p1,p2');
-  });
-  await test('小程序冲突只保存本人选择的整条记录', async () => {
-    let sent; const state=mini({callOperations:async(action,payload)=>{sent={action,payload};}}); state.load=async()=>{}; await state.resolveConflict({_id:'a1',version:4},'retained'); assert.equal(sent.action,'resolveAttendanceConflict'); assert.equal(sent.payload.choice,'retained'); assert.equal(sent.payload.expectedVersion,4);
+  await test('现场端考勤页已改为只读，写操作与冲突选择已移除', async () => {
+    const source = fs.readFileSync(miniFile, 'utf8');
+    assert.ok(/conflicts/.test(source));
+    assert.ok(/联系管理员处理/.test(source));
+    assert.ok(!/saveAttendance|resolveAttendanceConflict|selectedHours/.test(source));
+    assert.ok(!/\bedit\(/.test(source));
   });
   const {createMemoryDb} = require(root+'/mes-uniapp/tests/helpers/memory-db.cjs');
   const db=createMemoryDb();

@@ -71,3 +71,19 @@
 .ops-history-diff { display: flex; flex-direction: column; gap: .65rem; padding: .8rem 0; line-height: 1.65; }
 .ops-diff-before { color: $uni-text-color-grey; }
 @media (max-width: 600px) { .ops-import-steps { grid-template-columns: minmax(0, 1fr); } }
+
+/* 考勤冲突：现场端只读后由管理员确认采用新排班还是保留本人记录。 */
+.ops-conflict-card { padding: .9rem 1.1rem; border: 1px solid rgba($uni-color-warning, .4); border-radius: .5rem; background: rgba($uni-color-warning, .05); }
+.ops-conflict-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.ops-conflict-row { margin-top: .8rem; padding: .8rem .9rem; border: 1px solid $uni-border-color; border-radius: .45rem; background: $uni-bg-color; }
+.ops-conflict-meta { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.ops-conflict-compare { display: flex; gap: .8rem; margin-top: .7rem; flex-wrap: wrap; }
+.ops-conflict-side { flex: 1 1 16rem; min-width: 13rem; padding: .6rem .75rem; border-radius: .4rem; background: $uni-bg-color-grey; }
+.ops-conflict-side.incoming { border-left: 3px solid $uni-color-primary; }
+.ops-conflict-side.retained { border-left: 3px solid $uni-color-warning; }
+.ops-conflict-side-title { font-weight: 600; font-size: .82rem; margin-bottom: .35rem; }
+.ops-conflict-item { display: flex; gap: .5rem; font-size: .8rem; line-height: 1.7; }
+.ops-conflict-item text:first-child { color: $uni-text-color-grey; flex: 0 0 2.8rem; }
+.ops-conflict-item text:last-child { overflow-wrap: anywhere; }
+.ops-conflict-actions { display: flex; align-items: center; gap: .6rem; margin-top: .7rem; flex-wrap: wrap; }
+.ops-conflict-actions button, .ops-conflict-head button { margin: 0; }
