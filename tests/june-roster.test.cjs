@@ -197,13 +197,13 @@ function reviewApprovedTimes(state) {
     loseImportResponse=true;
     await state.importRows();
     const firstAccepted=values('schedules').map(row=>({_id:row._id,version:row.version}));
-    await check('首批保存后的响应丢失可见且不清理旧记录',async()=> { assert.ok(state.importError.includes('模拟云端保存成功但响应丢失')); assert.equal(firstAccepted.length,20); });
+    await check('首批保存后的响应丢失可见且不清理旧记录',async()=> { assert.ok(state.importError.includes('模拟云端保存成功但响应丢失')); assert.equal(firstAccepted.length,Number((fs.readFileSync(ADMIN + '/pages/mes/operations/schedules.vue','utf8').match(/const IMPORT_CHUNK_SIZE = (\d+)/)||[])[1]||0)); });
     console.log('PROGRESS resuming ' + results.expected.schedules + ' schedules');
     await state.importRows();
     results.import = {stage:state.importStage,error:state.importError,notice:state.importNotice,schedules:values('schedules').length,attendance:values('attendance').length,personnel:values('personnel').length,processes:values('processes').length,versions:values('versions').length};
     if (state.importError) { fs.writeFileSync(OUTPUT,JSON.stringify(results,null,2)); throw new Error(state.importError); }
     await check('完整25天写入及考勤同步成功',async()=> { assert.equal(state.importError,''); assert.equal(state.importStage,'完成'); assert.equal(values('schedules').length,state.previews.length); assert.ok(values('attendance').length); });
-    await check('重试已保存的20条不重复新增版本',async()=> { for (const previous of firstAccepted) assert.equal(db.ensure('mes_ops_schedules').get(previous._id).version,previous.version); });
+    await check('重试已保存的首批不重复新增版本',async()=> { for (const previous of firstAccepted) assert.equal(db.ensure('mes_ops_schedules').get(previous._id).version,previous.version); });
     await check('考勤逐人逐班与独立工时去重计算一致',async()=> { assert.ok(Number.isFinite(expectedHours)); assert.equal(values('attendance').length,expectedAttendance.size); for (const row of values('attendance')) { const expected=expectedAttendance.get(JSON.stringify([row.date,row.personName,row.shiftId||''])); assert.ok(expected); assert.equal(row.workHours,expected.hours); assert.deepEqual([...row.processIds].sort(),[...expected.processIds].sort()); } });
     await check('6月27日只有11人出勤，其余已知人员自动休息',async()=> { const day=values('attendance').filter(row=>row.date==='2026-06-27'); assert.equal(day.filter(row=>row.kind==='work').length,11); assert.equal(day.filter(row=>row.kind==='rest').length,results.expected.people-11); });
     await check('未上传的6月5/19/20/21/28日不生成排班和考勤',async()=> { for (const date of ['2026-06-05','2026-06-19','2026-06-20','2026-06-21','2026-06-28']) { assert.ok(!values('schedules').some(row=>row.date===date)); assert.ok(!values('attendance').some(row=>row.date===date)); } });
@@ -226,9 +226,14 @@ function reviewApprovedTimes(state) {
     const schedule=values('schedules').find(row=>row.personId===target.personId && row.date===target.date && row.processId===target.processIds[0]);
     await callOperations('saveSchedule',{record:{...schedule,endTime:'20:00',changeReason:'测试重新排班产生冲突'},expectedVersion:schedule.version});
     const conflicted=db.ensure('mes_ops_attendance').get(target._id);
-    await check('新排班保留本人修改并生成可选择的冲突',async()=> { assert.ok(conflicted.conflict); assert.equal(conflicted.conflict.retained.workHours,9); assert.equal(conflicted.conflict.incoming.workHours,12); await assert.rejects(callOperations('resolveAttendanceConflict',{id:target._id,choice:'retained',expectedVersion:conflicted.version,requestId:'test-admin-resolve-conflict'}),error=>error.code===403); });
-    const chosen=await own('resolveAttendanceConflict',{id:target._id,choice:'retained',expectedVersion:conflicted.version,requestId:'test-user-resolve-conflict'});
-    await check('本人保留原修改后统计采用9小时，历史可追溯',async()=> { assert.equal(chosen.workHours,9); assert.equal(chosen.conflict,null); const history=await own('attendanceHistory',{id:target._id}); assert.ok(history.versions.length>=4); assert.ok(history.versions.some(row=>row.conflict)); });
+    await check('新排班保留本人修改并生成可选择的冲突',async()=> { assert.ok(conflicted.conflict); assert.equal(conflicted.conflict.retained.workHours,9); assert.equal(conflicted.conflict.incoming.workHours,12); });
+    // 冲突统一由后台管理员处理：管理员可处理他人冲突，其他操作员仍 403。
+    db.ensure('uni-id-users').set('test-other-operator',{_id:'test-other-operator',status:0,username:'其他操作员'});
+    const other=values('personnel').find(row=>row.scopeRole==='operator' && row._id!==person._id);
+    await callOperations('saveCatalog',{type:'personnel',expectedVersion:other.version,record:{...other,uid:'test-other-operator',changeReason:'测试他人冲突权限'}});
+    await check('非本人且非管理员不能处理他人冲突',async()=> { const error=await execute(db,{uid:'test-other-operator',role:[]},{action:'resolveAttendanceConflict',id:target._id,choice:'retained',expectedVersion:conflicted.version,requestId:'test-other-resolve-conflict'}).then(()=>null,error=>error); assert.equal(error&&error.code,403); });
+    const chosen=await callOperations('resolveAttendanceConflict',{id:target._id,choice:'retained',expectedVersion:conflicted.version,requestId:'test-admin-resolve-conflict'});
+    await check('管理员保留原修改后统计采用9小时，历史可追溯',async()=> { assert.equal(chosen.workHours,9); assert.equal(chosen.conflict,null); const history=await own('attendanceHistory',{id:target._id}); assert.ok(history.versions.length>=4); assert.ok(history.versions.some(row=>row.conflict)); });
     db.ensure('mes_ops_personnel').get(target.personId).scopeRole='team_lead';
     await check('历史班组长账号按操作员生效且不能排班',async()=> { const base=await own('bootstrap',{}); assert.equal(base.profile.scopeRole,'operator'); assert.equal(base.catalogs.teams,undefined); await assert.rejects(own('saveSchedule',{record:{...schedule,changeReason:'旧角色越权测试'},expectedVersion:schedule.version+1}),error=>error.code===403); });
   }

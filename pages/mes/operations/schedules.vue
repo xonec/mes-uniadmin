@@ -82,7 +82,10 @@ import { callOperations, emptyCatalogs, options, catalogName, today, operationRe
 import { readScheduleFile, previewScheduleBatch, checkScheduleBatch, scheduleDateSources } from '@/utils/schedule-import.js';
 import { completeScheduleRest, summarizeSchedulePeople, scheduleDifferences } from '@/utils/schedule-import-rules.js';
 import { DAY_OPTIONS, shiftTimeLabel, applyShift } from '@/utils/shift-presets.js';
-const IMPORT_CHUNK_SIZE = 20;
+// 服务端单次导入上限 200 行；一次按上限提交，减少往返、让预取在更大批次内复用。
+const IMPORT_CHUNK_SIZE = 200;
+// 收尾接口每页最多 20 条旧排班快照，与导入分片分开。
+const FINISH_PAGE_SIZE = 20;
 function blank() { return { kind: 'work', note: '', date: today(), shiftId: '', processId: '', personId: '', post: '', batchText: '', startTime: '', endTime: '', startDayOffset: '', endDayOffset: '', enabled: true, changeReason: '' }; }
 function blankMapping() { return { mode: 'rows', systemHours: 8, note: '', early: '', middle: '', late: '', startLine: 2, date: '', shiftId: '', processId: '', personId: '', post: '', batchNos: '', startTime: '', endTime: '' }; }
 /** 排班导入自动建档的人还没有登录账号，提示管理员到「系统管理 → 账号与权限 → 用户账号 → 批量建号」建号（不在这里建号）。 */
@@ -475,10 +478,10 @@ export default {
           const keepIds = new Set(prepared.map(row => row._id));
           for (const scope of session.scopes) {
             const previousRows = scope.rows.filter(row => !keepIds.has(row.id));
-            for (let offset = 0; offset < previousRows.length; offset += IMPORT_CHUNK_SIZE) {
+            for (let offset = 0; offset < previousRows.length; offset += FINISH_PAGE_SIZE) {
               const key = scope.date + ':' + offset;
               if (session.finishedPages[key]) continue;
-              const data = await callOperations('finishScheduleImport', { workshopId: payload.workshopId, importRuleVersion: 3, date: scope.date, paged: true, sessionId: this.importRequest.id, previousRows: previousRows.slice(offset, offset + IMPORT_CHUNK_SIZE) });
+              const data = await callOperations('finishScheduleImport', { workshopId: payload.workshopId, importRuleVersion: 3, date: scope.date, paged: true, sessionId: this.importRequest.id, previousRows: previousRows.slice(offset, offset + FINISH_PAGE_SIZE) });
               if (data.paginationVersion !== 1) throw new Error('云端未支持分批收尾，请更新云函数后重试');
               session.finishedPages[key] = true; session.removed += Number(data.removed) || 0;
               this.importNotice = '本批 ' + selected.length + ' 人次已全部写入；累计停用 ' + session.removed + ' 条旧排班。';
